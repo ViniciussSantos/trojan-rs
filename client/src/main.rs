@@ -7,14 +7,12 @@ mod error;
 
 pub use error::Error;
 
-use crate::config::Config;
-
 fn main() -> Result<(), anyhow::Error> {
     let cli = Command::new(clap::crate_name!())
         .version(clap::crate_version!())
         .about(clap::crate_description!())
         .subcommand(Command::new(cli::AGENTS).about("List all agents"))
-        .subcommand(Command::new(cli::IDENTITY).about("Generates a new identity keypair"))
+        .subcommand(Command::new(cli::JOBS).about("List all jobs"))
         .subcommand(
             Command::new(cli::EXEC)
                 .about("Execute a command")
@@ -40,14 +38,13 @@ fn main() -> Result<(), anyhow::Error> {
 
     if let Some(_) = cli.subcommand_matches(cli::AGENTS) {
         cli::agents::run(&api_client)?;
-    } else if let Some(_) = cli.subcommand_matches(cli::IDENTITY) {
-        cli::identity::run();
+    } else if let Some(_) = cli.subcommand_matches(cli::JOBS) {
+        cli::jobs::run(&api_client)?;
     } else if let Some(matches) = cli.subcommand_matches(cli::EXEC) {
         // we can sfaely unwrap as the arguments are required
         let agent_id = matches.value_of("agent").unwrap();
         let command = matches.value_of("command").unwrap();
-        let conf = Config::load()?;
-        cli::exec::run(&api_client, agent_id, command, conf)?;
+        cli::exec::run(&api_client, agent_id, command)?;
     }
 
     Ok(())

@@ -7,15 +7,16 @@ use uuid::Uuid;
 impl Repository {
     pub async fn create_job(&self, db: &Pool<Postgres>, job: &Job) -> Result<(), Error> {
         const QUERY: &str = "INSERT INTO jobs
-            (id, encrypted_job, ephemeral_public_key, nonce, signature, agent_id)
-            VALUES ($1, $2, $3, $4, $5, $6)";
+            (id, created_at, executed_at, command, args, output, agent_id)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)";
 
         match sqlx::query(QUERY)
             .bind(job.id)
-            .bind(&job.encrypted_job)
-            .bind(&job.ephemeral_public_key)
-            .bind(&job.nonce)
-            .bind(&job.signature)
+            .bind(job.created_at)
+            .bind(job.executed_at)
+            .bind(&job.command)
+            .bind(&job.args)
+            .bind(&job.output)
             .bind(job.agent_id)
             .execute(db)
             .await
@@ -30,15 +31,12 @@ impl Repository {
 
     pub async fn update_job(&self, db: &Pool<Postgres>, job: &Job) -> Result<(), Error> {
         const QUERY: &str = "UPDATE jobs
-            SET encrypted_result = $1, result_ephemeral_public_key = $2,
-                result_nonce = $3, result_signature = $4
-            WHERE id = $5";
+            SET executed_at = $1, output = $2
+            WHERE id = $3";
 
         match sqlx::query(QUERY)
-            .bind(&job.encrypted_result)
-            .bind(&job.result_ephemeral_public_key)
-            .bind(&job.result_nonce)
-            .bind(&job.result_signature)
+            .bind(job.executed_at)
+            .bind(&job.output)
             .bind(job.id)
             .execute(db)
             .await
@@ -74,7 +72,7 @@ impl Repository {
         agent_id: Uuid,
     ) -> Result<Job, Error> {
         const QUERY: &str = "SELECT * FROM jobs
-            WHERE agent_id = $1 AND encrypted_result IS NULL
+            WHERE agent_id = $1 AND output IS NULL
             LIMIT 1";
 
         match sqlx::query_as::<_, Job>(QUERY)
@@ -83,7 +81,7 @@ impl Repository {
             .await
         {
             Err(err) => {
-                error!("find_job_for_agent: finding job: {}", &err);
+                error!("find_job_where_output_is_null: finding job: {}", &err);
                 Err(err.into())
             }
             Ok(None) => Err(Error::NotFound("Job not found.".to_string())),
@@ -91,10 +89,15 @@ impl Repository {
         }
     }
 
-    pub async fn delete_job(&self, db: &Pool<Postgres>, job_id: Uuid) -> Result<(), Error> {
-        const QUERY: &str = "DELETE FROM jobs WHERE id = $1";
+    pub async fn find_all_jobs(&self, db: &Pool<Postgres>) -> Result<Vec<Job>, Error> {
+        const QUERY: &str = "SELECT * FROM jobs ORDER BY created_at";
 
-        sqlx::query(QUERY).bind(job_id).execute(db).await?;
-        Ok(())
+        match sqlx::query_as::<_, Job>(QUERY).fetch_all(db).await {
+            Err(err) => {
+                error!("find_all_jobs: finding jobs: {}", &err);
+                Err(err.into())
+            }
+            Ok(res) => Ok(res),
+        }
     }
 }
