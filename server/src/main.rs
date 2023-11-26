@@ -39,7 +39,7 @@ async fn main() -> Result<(), anyhow::Error> {
 
     let routes = api::routes::routes(app_state);
 
-    match get_ip_address("vboxnet0") {
+    match get_ip_address("eth1") {
         Ok(ip) => {
             log::info!("starting server on: {}:{}", ip, config.port);
 
