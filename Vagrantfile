@@ -39,6 +39,7 @@ config.vm.define "machine02" do |node|
       v.cpus    = 2
     end
     node.vm.provision "file", source: "target/debug/server", destination: "/home/vagrant/server"
-    node.vm.provision "shell", path: "scripts/prepare.sh", args: "worker"
+    node.vm.provision "file", source: ".env", destination: "/home/vagrant/.env"
+    node.vm.provision "shell", path: "prepare.sh"
   end
 end
