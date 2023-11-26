@@ -18,3 +18,5 @@ target/
 
 ### Vagrant Patch ###
 *.box
+
+.env

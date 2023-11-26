@@ -32,9 +32,3 @@ impl std::convert::From<sqlx::Error> for Error {
         }
     }
 }
-
-impl std::convert::From<ed25519_dalek::SignatureError> for Error {
-    fn from(err: ed25519_dalek::SignatureError) -> Self {
-        Error::Internal(err.to_string())
-    }
-}

@@ -1,9 +1,8 @@
 use crate::api::AppState;
 use common::api;
-use std::convert::TryInto;
 use std::{sync::Arc, time::Duration};
 use uuid::Uuid;
-use warp::http::StatusCode;
+use warp::{http::StatusCode, Rejection};
 
 pub async fn create_job(
     state: Arc<AppState>,
@@ -36,8 +35,9 @@ pub async fn get_job_result(
 
     // long polling: 5 secs
     for _ in 0..5u64 {
-        match state.service.get_job_result(job_id).await? {
-            Some(job) => {
+        let job = state.service.find_job(job_id).await?;
+        match &job.output {
+            Some(_) => {
                 let job: api::Job = job.into();
                 let res = api::Response::ok(job);
                 let res_json = warp::reply::json(&res);
@@ -65,13 +65,8 @@ pub async fn get_agent_job(
             Some(job) => {
                 let agent_job = api::AgentJob {
                     id: job.id,
-                    encrypted_job: job.encrypted_job,
-                    ephemeral_public_key: job
-                        .ephemeral_public_key
-                        .try_into()
-                        .expect("get_agent_job: invalid ephemeral_public_key"),
-                    nonce: job.nonce.try_into().expect("get_agent_job: invalid nonce"),
-                    signature: job.signature,
+                    command: job.command,
+                    args: job.args.0,
                 };
 
                 let res = api::Response::ok(agent_job);
@@ -84,6 +79,16 @@ pub async fn get_agent_job(
 
     // if no job is found, return empty response
     let res = api::Response::<Option<()>>::ok(None);
+    let res_json = warp::reply::json(&res);
+    Ok(warp::reply::with_status(res_json, StatusCode::OK))
+}
+
+pub async fn get_jobs(state: Arc<AppState>) -> Result<impl warp::Reply, Rejection> {
+    let jobs = state.service.list_jobs().await?;
+    let jobs = jobs.into_iter().map(Into::into).collect();
+    let res = api::JobsList { jobs };
+
+    let res = api::Response::ok(res);
     let res_json = warp::reply::json(&res);
     Ok(warp::reply::with_status(res_json, StatusCode::OK))
 }
